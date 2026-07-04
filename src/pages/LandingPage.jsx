@@ -1,9 +1,12 @@
-import { useState, useEffect, useRef } from "react";
-// CHANGE 1 of 3: import useNavigate for the Login button
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+// animated-hero style: framer-motion word cycling
+import { motion } from "framer-motion";
+// card-fan-carousel: GSAP fan layout for gallery
+import SocialCards from "../components/ui/card-fan-carousel";
 
 // ═══════════════════════════════════════════════════════════════
-// IMAGES — served from /public/gallery/
+// IMAGES
 // ═══════════════════════════════════════════════════════════════
 const IMG_TROPICAL   = "/gallery/interior-tropical.jpg";
 const IMG_INDUSTRIAL = "/gallery/interior-industrial.jpg";
@@ -12,10 +15,19 @@ const IMG_SPICED     = "/gallery/dish-spiced.jpg";
 const IMG_SPREAD     = "/gallery/dish-spread.jpg";
 const IMG_TAPAS      = "/gallery/dish-tapas.jpg";
 
+// Gallery cards passed to the fan carousel — same images, same labels
+const GALLERY_CARDS = [
+  { imgUrl: IMG_TROPICAL,   alt: "The Dining Room" },
+  { imgUrl: IMG_INDUSTRIAL, alt: "The Bar Lounge" },
+  { imgUrl: IMG_TREE,       alt: "The Garden Room" },
+  { imgUrl: IMG_SPREAD,     alt: "Signature Sharing" },
+  { imgUrl: IMG_TAPAS,      alt: "Mezze & Fine Wine" },
+  { imgUrl: IMG_SPICED,     alt: "Chef's Selection" },
+];
+
 // ═══════════════════════════════════════════════════════════════
 // DATA
 // ═══════════════════════════════════════════════════════════════
-
 const BOKEH = [
   { id: 0, w: 280, top: "8%",  left: "3%",  dur: 13, d: 0   },
   { id: 1, w: 180, top: "58%", left: "80%", dur: 11, d: 2   },
@@ -79,7 +91,6 @@ const CSS = `
   input,select,textarea { font:inherit; }
   .fd { font-family:'Playfair Display',Georgia,serif; }
   .fs { font-family:'Inter',system-ui,sans-serif; }
-
   .eyebrow { font-family:'Inter',system-ui,sans-serif; font-size:11px; font-weight:500; letter-spacing:.3em; text-transform:uppercase; color:var(--gold); display:block; margin-bottom:20px; }
   .divider  { height:1px; border:none; background:linear-gradient(90deg,transparent,var(--gold) 40%,var(--gold) 60%,transparent); }
 
@@ -126,19 +137,6 @@ const CSS = `
   .mc:hover { background:var(--card2); transform:translateX(4px); }
   .mc:hover::before { opacity:1; }
 
-  /* GALLERY */
-  .gallery-grid { display:grid; grid-template-columns:repeat(3,1fr); grid-template-rows:280px 280px 240px; gap:10px; }
-  @media(max-width:900px){
-    .gallery-grid { grid-template-columns:1fr 1fr; grid-template-rows:220px 220px 180px 180px; }
-    .gc-big  { grid-column:1/3!important; grid-row:auto!important; }
-    .gc-wide { grid-column:1/3!important; }
-  }
-  .gc { overflow:hidden; position:relative; cursor:pointer; background:var(--card); }
-  .gc img { width:100%; height:100%; object-fit:cover; transition:transform .65s cubic-bezier(.4,0,.2,1),filter .4s; display:block; }
-  .gc:hover img { transform:scale(1.07); filter:brightness(.82); }
-  .gc .ov { position:absolute; inset:0; display:flex; align-items:flex-end; padding:20px; background:linear-gradient(to top,rgba(0,0,0,.7) 0%,rgba(0,0,0,.1) 40%,transparent 70%); opacity:0; transition:opacity .4s; }
-  .gc:hover .ov { opacity:1; }
-
   /* AWARDS */
   .marquee-track { display:flex; animation:marquee 32s linear infinite; white-space:nowrap; }
 
@@ -172,12 +170,30 @@ const CSS = `
     .hero-btns   { flex-direction:column!important; align-items:center!important; }
   }
 
-  /* ── ROUTER ADDITION: Login button compact styling on small screens ── */
+  /* ── ROUTER: Login button ── */
   .nav-login-btn { white-space:nowrap; }
   @media(max-width:480px){
-    .nav-login-btn { padding:10px 14px; letter-spacing:.1em; }
-    .nav-reserve-btn { padding:10px 14px; letter-spacing:.1em; }
+    .nav-login-btn  { padding:10px 14px; letter-spacing:.1em; }
+    .nav-reserve-btn{ padding:10px 14px; letter-spacing:.1em; }
   }
+
+  /* ── CARD FAN CAROUSEL: .fan-card dimensions + container height ── */
+  .fan-layout { min-height:38rem; }
+  .fan-card {
+    position:relative;
+    width:10rem;
+    height:16.5rem;
+    border-radius:14px;
+    overflow:hidden;
+    flex-shrink:0;
+    box-shadow:0 25px 60px rgba(0,0,0,0.65), 0 0 0 1px rgba(196,162,89,0.18);
+    transition:box-shadow .3s ease;
+  }
+  .fan-card:hover { box-shadow:0 35px 80px rgba(0,0,0,0.75), 0 0 0 1px rgba(196,162,89,0.45); }
+  @media(max-width:1024px){ .fan-layout{min-height:34rem;} .fan-card{width:8.5rem;height:14rem;} }
+  @media(max-width:768px) { .fan-layout{min-height:28rem;} .fan-card{width:7rem;  height:11.5rem;} }
+  @media(max-width:640px) { .fan-layout{min-height:26rem;} .fan-card{width:6rem;  height:10rem;} }
+  @media(max-width:480px) { .fan-layout{min-height:22rem;} .fan-card{width:5rem;  height:8.3rem;} }
 `;
 
 // ═══════════════════════════════════════════════════════════════
@@ -214,16 +230,12 @@ function R({ c = "", d = "", children }) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// COMPONENTS
+// NAV
 // ═══════════════════════════════════════════════════════════════
-
-// CHANGE 2 of 3: Nav now accepts navigate and renders Login + Reserve Table side by side.
-// Everything else in Nav is pixel-identical to the original.
 function Nav({ scrolled, onReserve }) {
   const navigate = useNavigate();
   return (
     <nav className={`nav ${scrolled ? "s" : ""}`}>
-      {/* Logo — unchanged */}
       <div style={{ display:"flex", alignItems:"center", gap:14 }}>
         <div style={{ width:1, height:32, background:"linear-gradient(to bottom,transparent,var(--gold) 30%,var(--gold) 70%,transparent)" }} />
         <div>
@@ -232,50 +244,110 @@ function Nav({ scrolled, onReserve }) {
         </div>
         <div style={{ width:1, height:32, background:"linear-gradient(to bottom,transparent,var(--gold) 30%,var(--gold) 70%,transparent)" }} />
       </div>
-
-      {/* Nav links — unchanged */}
       <div className="nav-links" style={{ display:"flex", gap:40 }}>
         {["Our Story","Menu","Gallery","Reserve"].map(l => <button key={l} className="nav-link">{l}</button>)}
       </div>
-
-      {/* CTA group — Login added before existing Reserve Table button */}
       <div style={{ display:"flex", gap:10, alignItems:"center", flexShrink:0 }}>
-        <button
-          className="btn btn-g nav-login-btn"
-          onClick={() => navigate("/auth")}
-        >
-          Login
-        </button>
-        <button
-          className="btn btn-p nav-reserve-btn"
-          onClick={onReserve}
-        >
-          Reserve Table
-        </button>
+        <button className="btn btn-g nav-login-btn" onClick={() => navigate("/auth")}>Login</button>
+        <button className="btn btn-p nav-reserve-btn" onClick={onReserve}>Reserve Table</button>
       </div>
     </nav>
   );
 }
 
+// ═══════════════════════════════════════════════════════════════
+// HERO — enhanced with animated-hero word cycling (framer-motion)
+// All existing content preserved; cycling descriptors added above headline
+// ═══════════════════════════════════════════════════════════════
 function Hero({ onReserve }) {
   const [loaded, setLoaded] = useState(false);
+
+  // animated-hero style: cycling luxury descriptors
+  const [wordIdx, setWordIdx] = useState(0);
+  const luxuryWords = useMemo(
+    () => ["Exquisite", "Timeless", "Transcendent", "Luxurious", "Unforgettable"],
+    []
+  );
+  useEffect(() => {
+    const t = setTimeout(
+      () => setWordIdx(i => (i + 1) % luxuryWords.length),
+      2200
+    );
+    return () => clearTimeout(t);
+  }, [wordIdx, luxuryWords]);
+
   useEffect(() => { const t = setTimeout(() => setLoaded(true), 120); return () => clearTimeout(t); }, []);
-  const show = d => ({ opacity:loaded?1:0, transform:loaded?"translateY(0)":"translateY(28px)", transition:`opacity .85s ${d}s cubic-bezier(.4,0,.2,1),transform .85s ${d}s cubic-bezier(.4,0,.2,1)` });
+  const show = d => ({
+    opacity: loaded ? 1 : 0,
+    transform: loaded ? "translateY(0)" : "translateY(28px)",
+    transition: `opacity .85s ${d}s cubic-bezier(.4,0,.2,1),transform .85s ${d}s cubic-bezier(.4,0,.2,1)`
+  });
+
   return (
     <section style={{ position:"relative", height:"100vh", minHeight:600, display:"flex", alignItems:"center", justifyContent:"center", overflow:"hidden" }}>
       <div style={{ position:"absolute", inset:0, background:"radial-gradient(ellipse at 35% 55%,rgba(100,60,18,.38) 0%,transparent 55%),radial-gradient(ellipse at 72% 20%,rgba(80,45,10,.22) 0%,transparent 48%),var(--bg)" }} />
       {BOKEH.map(b => <div key={b.id} className="bokeh" style={{ width:b.w, height:b.w, top:b.top, left:b.left, "--dur":`${b.dur}s`, "--d":`${b.d}s`, opacity:.18 }} />)}
       <div style={{ position:"absolute", top:"50%", left:0, right:0, height:1, background:"linear-gradient(90deg,transparent 0%,rgba(196,162,89,.12) 30%,rgba(196,162,89,.12) 70%,transparent 100%)", pointerEvents:"none" }} />
+
       <div style={{ position:"relative", zIndex:1, textAlign:"center", padding:"0 24px", maxWidth:920 }}>
-        <div style={show(0.2)}><span className="eyebrow" style={{ marginBottom:30 }}>Established 2018 · Mumbai, India</span></div>
-        <div style={show(0.4)}><h1 className="fd" style={{ fontSize:"clamp(50px,9vw,110px)", fontWeight:400, fontStyle:"italic", lineHeight:1.07, color:"var(--cream)", marginBottom:0 }}>Where Cuisine</h1></div>
-        <div style={show(0.52)}><h1 className="fd shimmer" style={{ fontSize:"clamp(50px,9vw,110px)", fontWeight:400, fontStyle:"italic", lineHeight:1.07, marginBottom:32 }}>Becomes Art</h1></div>
-        <div style={show(0.72)}><p style={{ fontSize:20, color:"var(--muted)", lineHeight:1.85, maxWidth:500, margin:"0 auto 46px" }}>A sanctuary of fine dining where each dish is a masterpiece, each evening an unforgettable memory.</p></div>
+
+        {/* Existing eyebrow — unchanged */}
+        <div style={show(0.2)}>
+          <span className="eyebrow" style={{ marginBottom:18 }}>Established 2018 · Mumbai, India</span>
+        </div>
+
+        {/* ── animated-hero style: vertically cycling luxury descriptor ── */}
+        <div style={{ ...show(0.32), position:"relative", height:"2.2rem", display:"flex", justifyContent:"center", alignItems:"center", overflow:"hidden", marginBottom:20 }}>
+          {luxuryWords.map((word, i) => (
+            <motion.span
+              key={i}
+              className="fd"
+              style={{
+                position: "absolute",
+                fontSize: "clamp(13px,1.6vw,18px)",
+                fontWeight: 400,
+                fontStyle: "italic",
+                letterSpacing: "0.55em",
+                textTransform: "uppercase",
+                color: "var(--gold)",
+                opacity: 0.85,
+              }}
+              initial={{ opacity: 0, y: 70 }}
+              animate={
+                wordIdx === i
+                  ? { opacity: 0.85, y: 0 }
+                  : { opacity: 0, y: wordIdx > i ? -70 : 70 }
+              }
+              transition={{ type: "spring", stiffness: 50 }}
+            >
+              {word}
+            </motion.span>
+          ))}
+        </div>
+
+        {/* Existing headline — unchanged */}
+        <div style={show(0.4)}>
+          <h1 className="fd" style={{ fontSize:"clamp(50px,9vw,110px)", fontWeight:400, fontStyle:"italic", lineHeight:1.07, color:"var(--cream)", marginBottom:0 }}>Where Cuisine</h1>
+        </div>
+        <div style={show(0.52)}>
+          <h1 className="fd shimmer" style={{ fontSize:"clamp(50px,9vw,110px)", fontWeight:400, fontStyle:"italic", lineHeight:1.07, marginBottom:32 }}>Becomes Art</h1>
+        </div>
+
+        {/* Existing subtitle — unchanged */}
+        <div style={show(0.72)}>
+          <p style={{ fontSize:20, color:"var(--muted)", lineHeight:1.85, maxWidth:500, margin:"0 auto 46px" }}>
+            A sanctuary of fine dining where each dish is a masterpiece, each evening an unforgettable memory.
+          </p>
+        </div>
+
+        {/* Existing CTAs — unchanged */}
         <div className="hero-btns" style={{ display:"flex", gap:16, justifyContent:"center", flexWrap:"wrap", ...show(0.9) }}>
           <button className="btn btn-p" onClick={onReserve}>Reserve a Table</button>
           <button className="btn btn-g">Explore Menu</button>
         </div>
       </div>
+
+      {/* Existing scroll indicator — unchanged */}
       <div style={{ position:"absolute", bottom:38, left:"50%", transform:"translateX(-50%)", display:"flex", flexDirection:"column", alignItems:"center", gap:10, opacity:loaded?.55:0, transition:"opacity 1.2s 1.4s" }}>
         <span className="fs scroll-ind" style={{ fontSize:9, letterSpacing:"0.28em", textTransform:"uppercase", color:"var(--muted)" }}>Scroll</span>
         <div className="scroll-ind" style={{ width:1, height:40, background:"linear-gradient(to bottom,var(--gold),transparent)" }} />
@@ -285,6 +357,9 @@ function Hero({ onReserve }) {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════
+// STORY — unchanged
+// ═══════════════════════════════════════════════════════════════
 function StorySection() {
   return (
     <section style={{ background:"var(--bg2)", padding:"140px 0" }}>
@@ -320,6 +395,9 @@ function StorySection() {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════
+// MENU — unchanged
+// ═══════════════════════════════════════════════════════════════
 function MenuSection({ activeTab, setActiveTab }) {
   return (
     <section style={{ padding:"140px 0" }}>
@@ -369,43 +447,37 @@ function MenuSection({ activeTab, setActiveTab }) {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════
+// GALLERY — card-fan-carousel replaces the static grid
+// Same 6 images · Same section heading · Same eyebrow
+// ═══════════════════════════════════════════════════════════════
 function GallerySection() {
-  const cells = [
-    { id:0, img:IMG_TROPICAL,   label:"The Dining Room",   cls:"gc-big", style:{ gridColumn:"1/3", gridRow:"1/3" } },
-    { id:1, img:IMG_INDUSTRIAL, label:"The Bar Lounge",    cls:"gc-sm",  style:{ gridColumn:"3",   gridRow:"1"   } },
-    { id:2, img:IMG_TREE,       label:"The Garden Room",   cls:"gc-sm",  style:{ gridColumn:"3",   gridRow:"2"   } },
-    { id:3, img:IMG_SPREAD,     label:"Signature Sharing", cls:"gc-sm",  style:{ gridColumn:"1",   gridRow:"3"   } },
-    { id:4, img:IMG_TAPAS,      label:"Mezze & Fine Wine", cls:"gc-sm",  style:{ gridColumn:"2",   gridRow:"3"   } },
-    { id:5, img:IMG_SPICED,     label:"Chef's Selection",  cls:"gc-sm",  style:{ gridColumn:"3",   gridRow:"3"   } },
-  ];
   return (
-    <section style={{ background:"var(--bg2)", paddingBottom:0 }}>
+    <section style={{ background:"var(--bg2)", paddingBottom:48 }}>
       <div style={{ maxWidth:1280, margin:"0 auto", padding:"120px 56px 0" }}>
         <R>
-          <div style={{ textAlign:"center", marginBottom:64 }}>
+          <div style={{ textAlign:"center", marginBottom:56 }}>
             <span className="eyebrow">The Experience</span>
-            <h2 className="fd" style={{ fontSize:"clamp(34px,4vw,56px)", fontWeight:400, fontStyle:"italic", color:"var(--cream)" }}>An Evening at Aurum</h2>
+            <h2 className="fd" style={{ fontSize:"clamp(34px,4vw,56px)", fontWeight:400, fontStyle:"italic", color:"var(--cream)" }}>
+              An Evening at Aurum
+            </h2>
           </div>
         </R>
       </div>
-      <div style={{ maxWidth:1280, margin:"0 auto", padding:"0 56px 0" }}>
-        <R>
-          <div className="gallery-grid">
-            {cells.map(cell => (
-              <div key={cell.id} className={`gc ${cell.cls}`} style={cell.style}>
-                <img src={cell.img} alt={cell.label} loading="lazy" />
-                <div className="ov">
-                  <span className="fs" style={{ fontSize:11, letterSpacing:"0.2em", textTransform:"uppercase", color:"var(--gold)" }}>{cell.label}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </R>
+      {/*
+        "dark" class enables dark: Tailwind variants on carousel arrows
+        so they render as white (visible on our dark background)
+      */}
+      <div className="dark">
+        <SocialCards cards={GALLERY_CARDS} />
       </div>
     </section>
   );
 }
 
+// ═══════════════════════════════════════════════════════════════
+// AWARDS — unchanged
+// ═══════════════════════════════════════════════════════════════
 function AwardsStrip() {
   const doubled = [...AWARDS, ...AWARDS];
   return (
@@ -417,6 +489,9 @@ function AwardsStrip() {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════
+// TESTIMONIALS — unchanged
+// ═══════════════════════════════════════════════════════════════
 function TestimonialsSection() {
   return (
     <section style={{ background:"var(--bg2)", padding:"140px 0" }}>
@@ -452,6 +527,9 @@ function TestimonialsSection() {
   );
 }
 
+// ═══════════════════════════════════════════════════════════════
+// RESERVATION — unchanged
+// ═══════════════════════════════════════════════════════════════
 function ReservationSection({ reserveRef, form, setForm, onSubmit, submitted }) {
   const f = key => e => setForm(p => ({ ...p, [key]: e.target.value }));
   return (
@@ -503,6 +581,9 @@ function ReservationSection({ reserveRef, form, setForm, onSubmit, submitted }) 
   );
 }
 
+// ═══════════════════════════════════════════════════════════════
+// FOOTER — unchanged
+// ═══════════════════════════════════════════════════════════════
 function Footer() {
   return (
     <footer style={{ background:"#080706", padding:"80px 0 40px", borderTop:"1px solid rgba(196,162,89,.1)" }}>
@@ -553,7 +634,7 @@ function Footer() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// CHANGE 3 of 3: Renamed from App → LandingPage (route / )
+// ROOT
 // ═══════════════════════════════════════════════════════════════
 export default function LandingPage() {
   const scrolled = useScrolled();
