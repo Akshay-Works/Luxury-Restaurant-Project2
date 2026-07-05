@@ -1,9 +1,13 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-// animated-hero style: framer-motion word cycling
 import { motion } from "framer-motion";
-// card-fan-carousel: GSAP fan layout for gallery
 import SocialCards from "../components/ui/card-fan-carousel";
+
+// ─── smooth scroll helper (used by nav, footer, hero) ───────────
+const scrollTo = (id) => {
+  const el = document.getElementById(id);
+  if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+};
 
 // ═══════════════════════════════════════════════════════════════
 // IMAGES
@@ -15,7 +19,6 @@ const IMG_SPICED     = "/gallery/dish-spiced.jpg";
 const IMG_SPREAD     = "/gallery/dish-spread.jpg";
 const IMG_TAPAS      = "/gallery/dish-tapas.jpg";
 
-// Gallery cards passed to the fan carousel — same images, same labels
 const GALLERY_CARDS = [
   { imgUrl: IMG_TROPICAL,   alt: "The Dining Room" },
   { imgUrl: IMG_INDUSTRIAL, alt: "The Bar Lounge" },
@@ -57,10 +60,26 @@ const MENU = {
   ],
 };
 
+// avatar: Unsplash headshots matching each reviewer's profile
 const TESTIMONIALS = [
-  { text: "An unparalleled dining experience that transcends the ordinary. Every dish tells a story of meticulous craftsmanship. Aurum has redefined what fine dining means in India.", name: "Priya Mehta",       role: "Senior Food Critic, Times of India", init: "PM" },
-  { text: "We celebrate every milestone at Aurum. The service is impeccable, the ambiance divine, the cuisine — extraordinary. It is the only address that never disappoints.",          name: "Rajan Khosla",     role: "Chairman, Citadel Group",           init: "RK" },
-  { text: "Aurum stands as a testament to what Indian fine dining can achieve on the global stage. Chef Kapoor's dedication to craft is evident in every single bite.",                   name: "Isabelle Fontaine", role: "Michelin Guide Contributor",        init: "IF" },
+  {
+    text: "An unparalleled dining experience that transcends the ordinary. Every dish tells a story of meticulous craftsmanship. Aurum has redefined what fine dining means in India.",
+    name: "Priya Mehta",
+    role: "Senior Food Critic, Times of India",
+    avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=100&h=100&fit=crop&q=80",
+  },
+  {
+    text: "We celebrate every milestone at Aurum. The service is impeccable, the ambiance divine, the cuisine — extraordinary. It is the only address that never disappoints.",
+    name: "Rajan Khosla",
+    role: "Chairman, Citadel Group",
+    avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=100&h=100&fit=crop&q=80",
+  },
+  {
+    text: "Aurum stands as a testament to what Indian fine dining can achieve on the global stage. Chef Kapoor's dedication to craft is evident in every single bite.",
+    name: "Isabelle Fontaine",
+    role: "Michelin Guide Contributor",
+    avatar: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=100&h=100&fit=crop&q=80",
+  },
 ];
 
 const AWARDS = [
@@ -140,10 +159,6 @@ const CSS = `
   /* AWARDS */
   .marquee-track { display:flex; animation:marquee 32s linear infinite; white-space:nowrap; }
 
-  /* TESTIMONIALS */
-  .tc { background:var(--card); padding:36px; border:1px solid var(--border); transition:border-color .3s,background .3s; }
-  .tc:hover { border-color:var(--bord-l); background:var(--card2); }
-
   /* FORM */
   .form-field { width:100%; background:var(--bg); border:1px solid var(--border); color:var(--cream); font-family:'Cormorant Garamond',Georgia,serif; font-size:17px; padding:14px 16px; outline:none; transition:border-color .25s; -webkit-appearance:none; appearance:none; }
   .form-field:focus { border-color:var(--gold); }
@@ -170,22 +185,18 @@ const CSS = `
     .hero-btns   { flex-direction:column!important; align-items:center!important; }
   }
 
-  /* ── ROUTER: Login button ── */
+  /* ── Login button ── */
   .nav-login-btn { white-space:nowrap; }
   @media(max-width:480px){
     .nav-login-btn  { padding:10px 14px; letter-spacing:.1em; }
     .nav-reserve-btn{ padding:10px 14px; letter-spacing:.1em; }
   }
 
-  /* ── CARD FAN CAROUSEL: .fan-card dimensions + container height ── */
+  /* ── Card fan carousel ── */
   .fan-layout { min-height:38rem; }
   .fan-card {
-    position:relative;
-    width:10rem;
-    height:16.5rem;
-    border-radius:14px;
-    overflow:hidden;
-    flex-shrink:0;
+    position:relative; width:10rem; height:16.5rem;
+    border-radius:14px; overflow:hidden; flex-shrink:0;
     box-shadow:0 25px 60px rgba(0,0,0,0.65), 0 0 0 1px rgba(196,162,89,0.18);
     transition:box-shadow .3s ease;
   }
@@ -194,6 +205,57 @@ const CSS = `
   @media(max-width:768px) { .fan-layout{min-height:28rem;} .fan-card{width:7rem;  height:11.5rem;} }
   @media(max-width:640px) { .fan-layout{min-height:26rem;} .fan-card{width:6rem;  height:10rem;} }
   @media(max-width:480px) { .fan-layout{min-height:22rem;} .fan-card{width:5rem;  height:8.3rem;} }
+
+  /* ── Testimonials interactive selector (testimonials.tsx style) ── */
+  .testi-quote-wrap { position:relative; padding:0 2.5rem; max-width:780px; margin:0 auto; }
+  .testi-quote-mark {
+    position:absolute; font-family:'Playfair Display',Georgia,serif;
+    font-size:7rem; line-height:1; color:var(--gold);
+    opacity:0.07; pointer-events:none; user-select:none;
+  }
+  .testi-quote-mark.open  { top:-1.2rem; left:0; }
+  .testi-quote-mark.close { bottom:-2.2rem; right:0; }
+  .testi-quote-text {
+    font-family:'Playfair Display',Georgia,serif;
+    font-size:clamp(20px,2.6vw,32px); font-weight:400; font-style:italic;
+    color:var(--cream); text-align:center; line-height:1.75;
+    transition:opacity .4s ease, filter .4s ease, transform .4s ease;
+  }
+  .testi-quote-text.animating { opacity:0; filter:blur(4px); transform:scale(.98); }
+  .testi-role-text {
+    font-family:'Inter',system-ui,sans-serif;
+    font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:var(--muted);
+    transition:opacity .5s ease, transform .5s ease;
+  }
+  .testi-role-text.animating { opacity:0; transform:translateY(8px); }
+  .testi-pill {
+    border-radius:9999px; cursor:pointer;
+    display:flex; align-items:center;
+    transition:all .5s cubic-bezier(.4,0,.2,1);
+    border:1px solid transparent; outline:none; background:none;
+  }
+  .testi-pill.active   { background:var(--gold); padding:6px 18px 6px 6px; border-color:var(--gold); box-shadow:0 4px 24px rgba(196,162,89,.3); }
+  .testi-pill.inactive { padding:2px; }
+  .testi-pill.inactive:hover { background:rgba(196,162,89,.12); border-color:rgba(196,162,89,.3); padding:6px 18px 6px 6px; }
+  .testi-pill-avatar {
+    width:2rem; height:2rem; border-radius:9999px; object-fit:cover; flex-shrink:0;
+    transition:all .5s cubic-bezier(.4,0,.2,1);
+  }
+  .testi-pill.active .testi-pill-avatar   { box-shadow:0 0 0 2px rgba(12,11,8,.25); }
+  .testi-pill.inactive:hover .testi-pill-avatar { transform:scale(1.05); }
+  .testi-pill-name-wrap {
+    display:grid; overflow:hidden;
+    transition:all .5s cubic-bezier(.4,0,.2,1);
+  }
+  .testi-pill-name-wrap.visible { grid-template-columns:1fr; opacity:1; margin-left:10px; }
+  .testi-pill-name-wrap.hidden  { grid-template-columns:0fr; opacity:0; margin-left:0; }
+  .testi-pill-name {
+    font-family:'Inter',system-ui,sans-serif; font-size:13px; font-weight:500;
+    white-space:nowrap; overflow:hidden; display:block;
+    transition:color .3s;
+  }
+  .testi-pill.active   .testi-pill-name { color:var(--bg); }
+  .testi-pill.inactive .testi-pill-name { color:var(--cream); }
 `;
 
 // ═══════════════════════════════════════════════════════════════
@@ -230,12 +292,22 @@ function R({ c = "", d = "", children }) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// NAV
+// NAV — all four links now scroll to their sections
 // ═══════════════════════════════════════════════════════════════
-function Nav({ scrolled, onReserve }) {
+function Nav({ scrolled }) {
   const navigate = useNavigate();
+
+  // map label → section id
+  const NAV_LINKS = [
+    { label: "Our Story", id: "story"   },
+    { label: "Menu",      id: "menu"    },
+    { label: "Gallery",   id: "gallery" },
+    { label: "Reserve",   id: "reserve" },
+  ];
+
   return (
     <nav className={`nav ${scrolled ? "s" : ""}`}>
+      {/* Logo */}
       <div style={{ display:"flex", alignItems:"center", gap:14 }}>
         <div style={{ width:1, height:32, background:"linear-gradient(to bottom,transparent,var(--gold) 30%,var(--gold) 70%,transparent)" }} />
         <div>
@@ -244,43 +316,43 @@ function Nav({ scrolled, onReserve }) {
         </div>
         <div style={{ width:1, height:32, background:"linear-gradient(to bottom,transparent,var(--gold) 30%,var(--gold) 70%,transparent)" }} />
       </div>
+
+      {/* Nav links → scroll to sections */}
       <div className="nav-links" style={{ display:"flex", gap:40 }}>
-        {["Our Story","Menu","Gallery","Reserve"].map(l => <button key={l} className="nav-link">{l}</button>)}
+        {NAV_LINKS.map(({ label, id }) => (
+          <button key={label} className="nav-link" onClick={() => scrollTo(id)}>{label}</button>
+        ))}
       </div>
+
+      {/* CTA */}
       <div style={{ display:"flex", gap:10, alignItems:"center", flexShrink:0 }}>
         <button className="btn btn-g nav-login-btn" onClick={() => navigate("/auth")}>Login</button>
-        <button className="btn btn-p nav-reserve-btn" onClick={onReserve}>Reserve Table</button>
+        <button className="btn btn-p nav-reserve-btn" onClick={() => scrollTo("reserve")}>Reserve Table</button>
       </div>
     </nav>
   );
 }
 
 // ═══════════════════════════════════════════════════════════════
-// HERO — enhanced with animated-hero word cycling (framer-motion)
-// All existing content preserved; cycling descriptors added above headline
+// HERO — animated-hero word cycling + "Explore Menu" connected
 // ═══════════════════════════════════════════════════════════════
-function Hero({ onReserve }) {
+function Hero() {
   const [loaded, setLoaded] = useState(false);
-
-  // animated-hero style: cycling luxury descriptors
   const [wordIdx, setWordIdx] = useState(0);
   const luxuryWords = useMemo(
     () => ["Exquisite", "Timeless", "Transcendent", "Luxurious", "Unforgettable"],
     []
   );
   useEffect(() => {
-    const t = setTimeout(
-      () => setWordIdx(i => (i + 1) % luxuryWords.length),
-      2200
-    );
+    const t = setTimeout(() => setWordIdx(i => (i + 1) % luxuryWords.length), 2200);
     return () => clearTimeout(t);
   }, [wordIdx, luxuryWords]);
-
   useEffect(() => { const t = setTimeout(() => setLoaded(true), 120); return () => clearTimeout(t); }, []);
+
   const show = d => ({
     opacity: loaded ? 1 : 0,
     transform: loaded ? "translateY(0)" : "translateY(28px)",
-    transition: `opacity .85s ${d}s cubic-bezier(.4,0,.2,1),transform .85s ${d}s cubic-bezier(.4,0,.2,1)`
+    transition: `opacity .85s ${d}s cubic-bezier(.4,0,.2,1),transform .85s ${d}s cubic-bezier(.4,0,.2,1)`,
   });
 
   return (
@@ -290,64 +362,46 @@ function Hero({ onReserve }) {
       <div style={{ position:"absolute", top:"50%", left:0, right:0, height:1, background:"linear-gradient(90deg,transparent 0%,rgba(196,162,89,.12) 30%,rgba(196,162,89,.12) 70%,transparent 100%)", pointerEvents:"none" }} />
 
       <div style={{ position:"relative", zIndex:1, textAlign:"center", padding:"0 24px", maxWidth:920 }}>
-
-        {/* Existing eyebrow — unchanged */}
+        {/* Eyebrow */}
         <div style={show(0.2)}>
           <span className="eyebrow" style={{ marginBottom:18 }}>Established 2018 · Mumbai, India</span>
         </div>
 
-        {/* ── animated-hero style: vertically cycling luxury descriptor ── */}
+        {/* animated-hero style cycling descriptor */}
         <div style={{ ...show(0.32), position:"relative", height:"2.2rem", display:"flex", justifyContent:"center", alignItems:"center", overflow:"hidden", marginBottom:20 }}>
           {luxuryWords.map((word, i) => (
             <motion.span
               key={i}
               className="fd"
-              style={{
-                position: "absolute",
-                fontSize: "clamp(13px,1.6vw,18px)",
-                fontWeight: 400,
-                fontStyle: "italic",
-                letterSpacing: "0.55em",
-                textTransform: "uppercase",
-                color: "var(--gold)",
-                opacity: 0.85,
-              }}
-              initial={{ opacity: 0, y: 70 }}
-              animate={
-                wordIdx === i
-                  ? { opacity: 0.85, y: 0 }
-                  : { opacity: 0, y: wordIdx > i ? -70 : 70 }
-              }
-              transition={{ type: "spring", stiffness: 50 }}
+              style={{ position:"absolute", fontSize:"clamp(13px,1.6vw,18px)", fontWeight:400, fontStyle:"italic", letterSpacing:"0.55em", textTransform:"uppercase", color:"var(--gold)", opacity:.85 }}
+              initial={{ opacity:0, y:70 }}
+              animate={wordIdx === i ? { opacity:.85, y:0 } : { opacity:0, y: wordIdx > i ? -70 : 70 }}
+              transition={{ type:"spring", stiffness:50 }}
             >
               {word}
             </motion.span>
           ))}
         </div>
 
-        {/* Existing headline — unchanged */}
-        <div style={show(0.4)}>
-          <h1 className="fd" style={{ fontSize:"clamp(50px,9vw,110px)", fontWeight:400, fontStyle:"italic", lineHeight:1.07, color:"var(--cream)", marginBottom:0 }}>Where Cuisine</h1>
-        </div>
-        <div style={show(0.52)}>
-          <h1 className="fd shimmer" style={{ fontSize:"clamp(50px,9vw,110px)", fontWeight:400, fontStyle:"italic", lineHeight:1.07, marginBottom:32 }}>Becomes Art</h1>
-        </div>
+        {/* Main headline */}
+        <div style={show(0.4)}><h1 className="fd" style={{ fontSize:"clamp(50px,9vw,110px)", fontWeight:400, fontStyle:"italic", lineHeight:1.07, color:"var(--cream)", marginBottom:0 }}>Where Cuisine</h1></div>
+        <div style={show(0.52)}><h1 className="fd shimmer" style={{ fontSize:"clamp(50px,9vw,110px)", fontWeight:400, fontStyle:"italic", lineHeight:1.07, marginBottom:32 }}>Becomes Art</h1></div>
 
-        {/* Existing subtitle — unchanged */}
+        {/* Subtitle */}
         <div style={show(0.72)}>
           <p style={{ fontSize:20, color:"var(--muted)", lineHeight:1.85, maxWidth:500, margin:"0 auto 46px" }}>
             A sanctuary of fine dining where each dish is a masterpiece, each evening an unforgettable memory.
           </p>
         </div>
 
-        {/* Existing CTAs — unchanged */}
+        {/* CTAs — both now connected */}
         <div className="hero-btns" style={{ display:"flex", gap:16, justifyContent:"center", flexWrap:"wrap", ...show(0.9) }}>
-          <button className="btn btn-p" onClick={onReserve}>Reserve a Table</button>
-          <button className="btn btn-g">Explore Menu</button>
+          <button className="btn btn-p" onClick={() => scrollTo("reserve")}>Reserve a Table</button>
+          <button className="btn btn-g" onClick={() => scrollTo("menu")}>Explore Menu</button>
         </div>
       </div>
 
-      {/* Existing scroll indicator — unchanged */}
+      {/* Scroll indicator */}
       <div style={{ position:"absolute", bottom:38, left:"50%", transform:"translateX(-50%)", display:"flex", flexDirection:"column", alignItems:"center", gap:10, opacity:loaded?.55:0, transition:"opacity 1.2s 1.4s" }}>
         <span className="fs scroll-ind" style={{ fontSize:9, letterSpacing:"0.28em", textTransform:"uppercase", color:"var(--muted)" }}>Scroll</span>
         <div className="scroll-ind" style={{ width:1, height:40, background:"linear-gradient(to bottom,var(--gold),transparent)" }} />
@@ -358,11 +412,11 @@ function Hero({ onReserve }) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// STORY — unchanged
+// STORY — id="story" added
 // ═══════════════════════════════════════════════════════════════
 function StorySection() {
   return (
-    <section style={{ background:"var(--bg2)", padding:"140px 0" }}>
+    <section id="story" style={{ background:"var(--bg2)", padding:"140px 0" }}>
       <div className="section" style={{ paddingTop:0, paddingBottom:0 }}>
         <div className="story-grid" style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:88, alignItems:"center" }}>
           <div>
@@ -396,11 +450,11 @@ function StorySection() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// MENU — unchanged
+// MENU — id="menu" added
 // ═══════════════════════════════════════════════════════════════
 function MenuSection({ activeTab, setActiveTab }) {
   return (
-    <section style={{ padding:"140px 0" }}>
+    <section id="menu" style={{ padding:"140px 0" }}>
       <div className="section" style={{ paddingTop:0, paddingBottom:0 }}>
         <R>
           <div style={{ textAlign:"center", marginBottom:64 }}>
@@ -448,12 +502,11 @@ function MenuSection({ activeTab, setActiveTab }) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// GALLERY — card-fan-carousel replaces the static grid
-// Same 6 images · Same section heading · Same eyebrow
+// GALLERY — id="gallery" added, card-fan-carousel
 // ═══════════════════════════════════════════════════════════════
 function GallerySection() {
   return (
-    <section style={{ background:"var(--bg2)", paddingBottom:48 }}>
+    <section id="gallery" style={{ background:"var(--bg2)", paddingBottom:48 }}>
       <div style={{ maxWidth:1280, margin:"0 auto", padding:"120px 56px 0" }}>
         <R>
           <div style={{ textAlign:"center", marginBottom:56 }}>
@@ -464,10 +517,6 @@ function GallerySection() {
           </div>
         </R>
       </div>
-      {/*
-        "dark" class enables dark: Tailwind variants on carousel arrows
-        so they render as white (visible on our dark background)
-      */}
       <div className="dark">
         <SocialCards cards={GALLERY_CARDS} />
       </div>
@@ -490,11 +539,29 @@ function AwardsStrip() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// TESTIMONIALS — unchanged
+// TESTIMONIALS — interactive pill selector (testimonials.tsx style)
+// id="voices" · same quotes, names, roles · avatars added
 // ═══════════════════════════════════════════════════════════════
 function TestimonialsSection() {
+  const [activeIdx, setActiveIdx]       = useState(0);
+  const [isAnimating, setIsAnimating]   = useState(false);
+  const [displayedQuote, setDisplayedQuote] = useState(TESTIMONIALS[0].text);
+  const [displayedRole, setDisplayedRole]   = useState(TESTIMONIALS[0].role);
+  const [hoveredIdx, setHoveredIdx]     = useState(null);
+
+  const handleSelect = (i) => {
+    if (i === activeIdx || isAnimating) return;
+    setIsAnimating(true);
+    setTimeout(() => {
+      setDisplayedQuote(TESTIMONIALS[i].text);
+      setDisplayedRole(TESTIMONIALS[i].role);
+      setActiveIdx(i);
+      setTimeout(() => setIsAnimating(false), 400);
+    }, 200);
+  };
+
   return (
-    <section style={{ background:"var(--bg2)", padding:"140px 0" }}>
+    <section id="voices" style={{ background:"var(--bg2)", padding:"140px 0" }}>
       <div className="section" style={{ paddingTop:0, paddingBottom:0 }}>
         <R>
           <div style={{ textAlign:"center", marginBottom:72 }}>
@@ -502,25 +569,46 @@ function TestimonialsSection() {
             <h2 className="fd" style={{ fontSize:"clamp(34px,4vw,56px)", fontWeight:400, fontStyle:"italic", color:"var(--cream)" }}>Voices of Aurum</h2>
           </div>
         </R>
-        <div className="testi-grid" style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:20 }}>
-          {TESTIMONIALS.map((t,i) => (
-            <R key={t.name} d={`d${i+1}`}>
-              <div className="tc" style={{ height:"100%", display:"flex", flexDirection:"column" }}>
-                <div style={{ display:"flex", gap:3, marginBottom:24 }}>{[...Array(5)].map((_,s)=><span key={s} style={{ color:"var(--gold)", fontSize:13 }}>★</span>)}</div>
-                <div className="fd" style={{ fontSize:64, lineHeight:.7, color:"var(--gold)", opacity:.25, marginBottom:16, fontStyle:"italic" }}>"</div>
-                <p style={{ fontSize:17, color:"var(--text)", lineHeight:1.82, marginBottom:32, fontStyle:"italic", flex:1 }}>{t.text}</p>
-                <div style={{ display:"flex", alignItems:"center", gap:14 }}>
-                  <div style={{ width:42, height:42, borderRadius:"50%", background:"linear-gradient(135deg,rgba(196,162,89,.28),rgba(196,162,89,.08))", border:"1px solid rgba(196,162,89,.25)", display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
-                    <span className="fd" style={{ fontSize:14, color:"var(--gold)", fontWeight:500 }}>{t.init}</span>
-                  </div>
-                  <div>
-                    <div style={{ fontSize:16, color:"var(--cream)", fontWeight:500 }}>{t.name}</div>
-                    <div className="fs" style={{ fontSize:11, color:"var(--muted)", letterSpacing:"0.05em", marginTop:2 }}>{t.role}</div>
-                  </div>
-                </div>
-              </div>
-            </R>
-          ))}
+
+        {/* Interactive testimonial body */}
+        <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:52 }}>
+
+          {/* Quote block */}
+          <div className="testi-quote-wrap">
+            <span className="testi-quote-mark open">"</span>
+            <p className={`testi-quote-text${isAnimating ? " animating" : ""}`}>{displayedQuote}</p>
+            <span className="testi-quote-mark close">"</span>
+          </div>
+
+          {/* Role + avatar pills */}
+          <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:24 }}>
+            <p className={`testi-role-text${isAnimating ? " animating" : ""}`}>{displayedRole}</p>
+
+            <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:8 }}>
+              {TESTIMONIALS.map((t, i) => {
+                const isActive  = activeIdx === i;
+                const isHovered = hoveredIdx === i && !isActive;
+                const showName  = isActive || isHovered;
+                return (
+                  <button
+                    key={t.name}
+                    className={`testi-pill ${isActive ? "active" : "inactive"}`}
+                    onClick={() => handleSelect(i)}
+                    onMouseEnter={() => setHoveredIdx(i)}
+                    onMouseLeave={() => setHoveredIdx(null)}
+                  >
+                    <img src={t.avatar} alt={t.name} className="testi-pill-avatar" />
+                    <div className={`testi-pill-name-wrap ${showName ? "visible" : "hidden"}`}>
+                      <div style={{ overflow:"hidden" }}>
+                        <span className="testi-pill-name">{t.name}</span>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
         </div>
       </div>
     </section>
@@ -528,12 +616,12 @@ function TestimonialsSection() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// RESERVATION — unchanged
+// RESERVATION — id="reserve" added
 // ═══════════════════════════════════════════════════════════════
-function ReservationSection({ reserveRef, form, setForm, onSubmit, submitted }) {
+function ReservationSection({ form, setForm, onSubmit, submitted }) {
   const f = key => e => setForm(p => ({ ...p, [key]: e.target.value }));
   return (
-    <section ref={reserveRef} style={{ padding:"140px 0" }}>
+    <section id="reserve" style={{ padding:"140px 0" }}>
       <div className="section" style={{ paddingTop:0, paddingBottom:0 }}>
         <div className="res-grid" style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:88, alignItems:"start" }}>
           <div>
@@ -582,9 +670,13 @@ function ReservationSection({ reserveRef, form, setForm, onSubmit, submitted }) 
 }
 
 // ═══════════════════════════════════════════════════════════════
-// FOOTER — unchanged
+// FOOTER — Navigate + Reserve links all connected
 // ═══════════════════════════════════════════════════════════════
 function Footer() {
+  // Map footer link text → section id
+  const NAV_MAP  = { "Our Story":"story", "Menu":"menu", "Gallery":"gallery", "Events":"reserve", "Press":"voices" };
+  const RES_MAP  = { "Book a Table":"reserve", "Private Dining":"reserve", "Wine Programme":"menu", "Gift Vouchers":"reserve", "Tasting Menu":"menu" };
+
   return (
     <footer style={{ background:"#080706", padding:"80px 0 40px", borderTop:"1px solid rgba(196,162,89,.1)" }}>
       <div style={{ maxWidth:1280, margin:"0 auto", padding:"0 56px" }}>
@@ -603,14 +695,24 @@ function Footer() {
               {["IG","FB","TW","YT"].map(s=><div key={s} style={{ width:34, height:34, border:"1px solid var(--border)", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer" }}><span className="fs" style={{ fontSize:10, color:"var(--muted)" }}>{s}</span></div>)}
             </div>
           </div>
+
+          {/* Navigate — all connected */}
           <div>
             <div className="fs" style={{ fontSize:10, letterSpacing:"0.25em", textTransform:"uppercase", color:"var(--gold)", marginBottom:20 }}>Navigate</div>
-            {["Our Story","Menu","Gallery","Events","Press"].map(l=><button key={l} className="flink">{l}</button>)}
+            {Object.entries(NAV_MAP).map(([label, id]) => (
+              <button key={label} className="flink" onClick={() => scrollTo(id)}>{label}</button>
+            ))}
           </div>
+
+          {/* Reserve — all connected */}
           <div>
             <div className="fs" style={{ fontSize:10, letterSpacing:"0.25em", textTransform:"uppercase", color:"var(--gold)", marginBottom:20 }}>Reserve</div>
-            {["Book a Table","Private Dining","Wine Programme","Gift Vouchers","Tasting Menu"].map(l=><button key={l} className="flink">{l}</button>)}
+            {Object.entries(RES_MAP).map(([label, id]) => (
+              <button key={label} className="flink" onClick={() => scrollTo(id)}>{label}</button>
+            ))}
           </div>
+
+          {/* Contact */}
           <div>
             <div className="fs" style={{ fontSize:10, letterSpacing:"0.25em", textTransform:"uppercase", color:"var(--gold)", marginBottom:20 }}>Contact</div>
             <div style={{ fontSize:15, color:"var(--muted)", lineHeight:1.85 }}>
@@ -620,6 +722,7 @@ function Footer() {
             </div>
           </div>
         </div>
+
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", flexWrap:"wrap", gap:16 }}>
           <p className="fs" style={{ fontSize:11, color:"var(--muted)", letterSpacing:"0.05em" }}>© {new Date().getFullYear()} Aurum Fine Dining Pvt. Ltd. All rights reserved.</p>
           <div style={{ display:"flex", gap:28 }}>
@@ -641,23 +744,26 @@ export default function LandingPage() {
   const [activeMenu, setActiveMenu] = useState("Entrée");
   const [form, setForm] = useState({ name:"", email:"", phone:"", date:"", time:"7:30 PM", guests:"2", notes:"" });
   const [submitted, setSubmitted] = useState(false);
-  const reserveRef = useRef(null);
-  const handleReserve = () => reserveRef.current?.scrollIntoView({ behavior:"smooth", block:"start" });
+
   const handleSubmit = () => {
-    if (form.name && form.email && form.date) { setSubmitted(true); setTimeout(() => setSubmitted(false), 5000); }
+    if (form.name && form.email && form.date) {
+      setSubmitted(true);
+      setTimeout(() => setSubmitted(false), 5000);
+    }
   };
+
   return (
     <>
       <style>{CSS}</style>
       <div style={{ background:"var(--bg)", minHeight:"100vh" }}>
-        <Nav scrolled={scrolled} onReserve={handleReserve} />
-        <Hero onReserve={handleReserve} />
+        <Nav scrolled={scrolled} />
+        <Hero />
         <StorySection />
         <MenuSection activeTab={activeMenu} setActiveTab={setActiveMenu} />
         <GallerySection />
         <AwardsStrip />
         <TestimonialsSection />
-        <ReservationSection reserveRef={reserveRef} form={form} setForm={setForm} onSubmit={handleSubmit} submitted={submitted} />
+        <ReservationSection form={form} setForm={setForm} onSubmit={handleSubmit} submitted={submitted} />
         <Footer />
       </div>
     </>
